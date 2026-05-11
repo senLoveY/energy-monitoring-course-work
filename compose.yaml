@@ -1,0 +1,176 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: python_backend/Dockerfile
+    container_name: energy_monitoring_app
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://user:root@postgres:5432/energy_monitoring
+      - APP_HOST=0.0.0.0
+      - APP_PORT=8081
+      - TIMEZONE_OFFSET_HOURS=3
+      - REPORT_SERVER_BASE_URL=http://localhost:8081
+      - EXCEL_DATA_PATH=/app/data/input.xlsx
+      - SESSION_SECRET=super-secret-session-key
+      - ADMIN_INVITE_CODE=admin123
+      - DEFAULT_ADMIN_USERNAME=admin
+      - DEFAULT_ADMIN_PASSWORD=admin123
+      - MAIL_MAILER=smtp
+      - MAIL_HOST=smtp.yandex.by
+      - MAIL_PORT=465
+      - MAIL_ENCRYPTION=ssl
+      - MAIL_USERNAME=energy.monitoring
+      - MAIL_PASSWORD=gsmfpovmtziodntt
+      - MAIL_FROM=energy.monitoring@yandex.by
+    volumes:
+      - "./Задание_2_Потребление_электроэнергии_Апрель (1).xlsx:/app/data/input.xlsx:ro"
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081/health')" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  simulator_pzs:
+    build:
+      context: .
+      dockerfile: python_backend/Dockerfile
+    container_name: energy_simulator_pzs
+    command: python -m app.simulator
+    environment:
+      - APP_INGEST_URL=http://app:8081/ingest/measurement
+      - DEVICE_GROUP=PZS
+      - SIM_INTERVAL_SECONDS=35
+      - AMPLITUDE=6.0
+      - NOISE=0.9
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+
+  simulator_china:
+    build:
+      context: .
+      dockerfile: python_backend/Dockerfile
+    container_name: energy_simulator_china
+    command: python -m app.simulator
+    environment:
+      - APP_INGEST_URL=http://app:8081/ingest/measurement
+      - DEVICE_GROUP=CHINA
+      - SIM_INTERVAL_SECONDS=40
+      - AMPLITUDE=4.5
+      - NOISE=0.8
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+
+  simulator_bg:
+    build:
+      context: .
+      dockerfile: python_backend/Dockerfile
+    container_name: energy_simulator_bg
+    command: python -m app.simulator
+    environment:
+      - APP_INGEST_URL=http://app:8081/ingest/measurement
+      - DEVICE_GROUP=BG
+      - SIM_INTERVAL_SECONDS=45
+      - AMPLITUDE=5.0
+      - NOISE=0.7
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+
+  simulator_sm:
+    build:
+      context: .
+      dockerfile: python_backend/Dockerfile
+    container_name: energy_simulator_sm
+    command: python -m app.simulator
+    environment:
+      - APP_INGEST_URL=http://app:8081/ingest/measurement
+      - DEVICE_GROUP=SM
+      - SIM_INTERVAL_SECONDS=45
+      - AMPLITUDE=3.8
+      - NOISE=0.6
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+
+  simulator_mo:
+    build:
+      context: .
+      dockerfile: python_backend/Dockerfile
+    container_name: energy_simulator_mo
+    command: python -m app.simulator
+    environment:
+      - APP_INGEST_URL=http://app:8081/ingest/measurement
+      - DEVICE_GROUP=MO
+      - SIM_INTERVAL_SECONDS=50
+      - AMPLITUDE=2.4
+      - NOISE=0.5
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+
+  simulator_dig:
+    build:
+      context: .
+      dockerfile: python_backend/Dockerfile
+    container_name: energy_simulator_dig
+    command: python -m app.simulator
+    environment:
+      - APP_INGEST_URL=http://app:8081/ingest/measurement
+      - DEVICE_GROUP=DIG
+      - SIM_INTERVAL_SECONDS=35
+      - AMPLITUDE=8.0
+      - NOISE=1.2
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+
+  simulator_cp:
+    build:
+      context: .
+      dockerfile: python_backend/Dockerfile
+    container_name: energy_simulator_cp
+    command: python -m app.simulator
+    environment:
+      - APP_INGEST_URL=http://app:8081/ingest/measurement
+      - DEVICE_GROUP=CP
+      - SIM_INTERVAL_SECONDS=30
+      - AMPLITUDE=10.0
+      - NOISE=1.0
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: 'postgres:16'
+    container_name: energy_monitoring_postgres
+    environment:
+      - 'POSTGRES_DB=energy_monitoring'
+      - 'POSTGRES_PASSWORD=root'
+      - 'POSTGRES_USER=user'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5455:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U user -d energy_monitoring" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

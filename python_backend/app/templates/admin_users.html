@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+        try {
+            if (localStorage.getItem("theme") === "dark") {
+                document.documentElement.classList.add("theme-dark");
+            }
+        } catch (_) { }
+    </script>
+    <meta name="theme-color" content="#1f2f4f">
+    <link rel="manifest" href="{{ url_for('static', path='manifest.webmanifest') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='styles/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='styles/activity.css') }}">
+    <title>Админ-панель</title>
+</head>
+
+<body>
+    <header class="header">
+        <div class="header-row">
+            <div class="user-panel">
+                <span class="brand-mark">Energy Monitoring</span>
+                <p class="number">Админ-панель пользователей</p>
+            </div>
+            <div class="user-panel">
+                <span>{{ current_user.username }} ({{ current_user_role_label }})</span>
+                <label class="theme-switch" for="theme-toggle">
+                    <span>Темная тема</span>
+                    <input id="theme-toggle" type="checkbox" aria-label="Переключить тему">
+                    <span class="slider" aria-hidden="true"></span>
+                </label>
+                <a class="link-btn" href="/activity">К отчету</a>
+                <a class="link-btn" href="/logout">Выйти</a>
+            </div>
+        </div>
+    </header>
+    <main>
+        <section class="activity-reports">
+            <section class="page-head">
+                <div>
+                    <h1 class="page-title">Пользователи</h1>
+                    <p class="page-subtitle">Управление ролями и контроль доступа к системе.</p>
+                </div>
+            </section>
+            <nav class="admin-tabs" aria-label="Разделы админки">
+                <button class="admin-tab active" type="button" data-tab-target="users">Пользователи</button>
+                <button class="admin-tab" type="button" data-tab-target="schedules">Расписания</button>
+                <button class="admin-tab" type="button" data-tab-target="settings">Настройки</button>
+                <button class="admin-tab" type="button" data-tab-target="queue">Очередь</button>
+                <button class="admin-tab" type="button" data-tab-target="history">История</button>
+                <button class="admin-tab" type="button" data-tab-target="audit">Аудит</button>
+            </nav>
+
+            <section class="admin-panel active" data-tab-panel="users">
+                <section class="admin-tools">
+                    <article class="insight-card">
+                        <h3>Коды администратора</h3>
+                        <p>Создавайте одноразовые коды для регистрации новых администраторов.</p>
+                        <form method="post" action="/admin/invite-codes/generate">
+                            <button class="refresh-btn" type="submit">Сгенерировать код</button>
+                        </form>
+                        {% if generated_code %}
+                        <p class="generated-code">Новый код: <strong>{{ generated_code }}</strong></p>
+                        {% endif %}
+                    </article>
+                    <article class="insight-card">
+                        <h3>Последние коды</h3>
+                        <div class="admin-code-list">
+                            {% for code in invite_codes %}
+                            <div class="admin-code-item">
+                                <span class="admin-code-value">{{ code.code }}</span>
+                                {% if code.used_at %}
+                                <span class="status-badge blocked">использован</span>
+                                {% else %}
+                                <span class="status-badge active">активен</span>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                            {% if not invite_codes %}
+                            <p class="page-subtitle">Коды еще не создавались.</p>
+                            {% endif %}
+                        </div>
+                    </article>
+                </section>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Идентификатор</th>
+                                <th>Пользователь</th>
+                                <th>Роль</th>
+                                <th>Смена роли</th>
+                                <th>Статус</th>
+                                <th>Создан</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in users %}
+                            <tr>
+                                <td>{{ user.id }}</td>
+                                <td>{{ user.username }}</td>
+                                <td><span class="role-badge {{ user.role }}">{{ role_labels.get(user.role, user.role)
+                                        }}</span></td>
+                                <td>
+                                    {% if user.id == current_user.id %}
+                                    <span class="page-subtitle">нельзя изменить себя</span>
+                                    {% else %}
+                                    <form method="post" action="/admin/users/{{ user.id }}/role" class="inline-actions role-edit-form">
+                                        <select name="role" class="role-select">
+                                            {% for role in role_choices %}
+                                            <option value="{{ role }}" {% if user.role==role %}selected{% endif %}>
+                                                {{ role_labels.get(role, role) }}
+                                            </option>
+                                            {% endfor %}
+                                        </select>
+                                        <button class="action-btn ghost" type="submit">Сохранить</button>
+                                    </form>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if user.is_blocked %}
+                                    <span class="status-badge blocked">заблокирован</span>
+                                    {% else %}
+                                    <span class="status-badge active">активен</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ user.created_at }}</td>
+                                <td>
+                                    {% if user.id == current_user.id %}
+                                    <span class="page-subtitle">текущий админ</span>
+                                    {% elif user.is_blocked %}
+                                    <form method="post" action="/admin/users/{{ user.id }}/unblock">
+                                        <button class="action-btn ok" type="submit">Разблокировать</button>
+                                    </form>
+                                    {% else %}
+                                    <form method="post" action="/admin/users/{{ user.id }}/block">
+                                        <button class="action-btn danger" type="submit">Заблокировать</button>
+                                    </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="admin-panel" data-tab-panel="schedules">
+                <article class="insight-card">
+                    <h3>Расписания рассылки</h3>
+                    <form method="post" action="/admin/schedules/create" class="schedule-form">
+                        <label for="sch-email">Email</label>
+                        <input id="sch-email" name="email" type="email" required placeholder="example@mail.com">
+
+                        <label for="sch-group">Группа</label>
+                        <select id="sch-group" name="group">
+                            <option value="all">Все группы</option>
+                            {% for group in available_groups %}
+                            <option value="{{ group.id }}">{{ group.label }}</option>
+                            {% endfor %}
+                        </select>
+
+                        <label for="sch-time">Время (HH:MM)</label>
+                        <input id="sch-time" name="send_time" type="time" value="08:00" required>
+
+                        <label for="sch-format">Формат</label>
+                        <select id="sch-format" name="export_format">
+                            <option value="both" selected>PDF + XLSX</option>
+                            <option value="pdf">Только PDF</option>
+                            <option value="xlsx">Только XLSX</option>
+                        </select>
+
+                        <label for="sch-template">Шаблон PDF</label>
+                        <select id="sch-template" name="template_mode">
+                            <option value="brief">Краткий</option>
+                            <option value="detailed" selected>Детальный</option>
+                        </select>
+
+                        <button class="refresh-btn" type="submit">Создать расписание</button>
+                    </form>
+                    {% if schedule_message %}
+                    <p class="generated-code">{{ schedule_message }}</p>
+                    {% endif %}
+                    <div class="admin-code-list">
+                        {% for item in schedules %}
+                        <div class="admin-code-item">
+                            <span class="admin-code-value">{{ item.send_time }} | {{ item.recipient_email }} | {{
+                                item.export_format }} | {{ item.template_mode }}</span>
+                            <div class="inline-actions">
+                                {% if item.is_enabled %}
+                                <span class="status-badge active">включено</span>
+                                {% else %}
+                                <span class="status-badge blocked">выключено</span>
+                                {% endif %}
+                                <form method="post" action="/admin/schedules/{{ item.id }}/toggle">
+                                    <button class="action-btn ghost" type="submit">
+                                        {% if item.is_enabled %}Выключить{% else %}Включить{% endif %}
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        {% if not schedules %}
+                        <p class="page-subtitle">Расписаний пока нет.</p>
+                        {% endif %}
+                    </div>
+                </article>
+            </section>
+
+            <section class="admin-panel" data-tab-panel="settings">
+                <article class="insight-card">
+                    <h3>Системные настройки времени</h3>
+                    <p>Текущее смещение: <strong>UTC{{ "%+d"|format(timezone_offset_hours) }}</strong></p>
+                    <form method="post" action="/admin/settings/timezone" class="schedule-form">
+                        <label for="tz-offset">Смещение UTC (часы)</label>
+                        <select id="tz-offset" name="timezone_offset_hours">
+                            {% for offset in range(-12, 15) %}
+                            <option value="{{ offset }}" {% if timezone_offset_hours==offset %}selected{% endif %}>
+                                UTC{{ "%+d"|format(offset) }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <button class="refresh-btn" type="submit">Сохранить часовой пояс</button>
+                    </form>
+                    {% if settings_message %}
+                    <p class="generated-code">{{ settings_message }}</p>
+                    {% endif %}
+                </article>
+            </section>
+
+            <section class="admin-panel" data-tab-panel="queue">
+                <article class="insight-card">
+                    <h3>Очередь отправки</h3>
+                    <div class="admin-code-list">
+                        {% for item in queue_items %}
+                        <div class="admin-code-item">
+                            <span class="admin-code-value">#{{ item.id }} {{ item.recipient_email }} {{
+                                item.export_format }} {{ item.report_date }}</span>
+                            <div class="inline-actions">
+                                {% if item.status == "sent" %}
+                                <span class="status-badge active">отправлено</span>
+                                {% elif item.status == "failed" %}
+                                <span class="status-badge blocked">ошибка</span>
+                                <form method="post" action="/admin/queue/{{ item.id }}/retry-now">
+                                    <button class="action-btn ok" type="submit">Повторить сейчас</button>
+                                </form>
+                                {% elif item.status == "pending" %}
+                                <span class="status-badge">в очереди</span>
+                                {% elif item.status == "retry" %}
+                                <span class="status-badge">повтор</span>
+                                {% else %}
+                                <span class="status-badge">{{ item.status }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                        {% if not queue_items %}
+                        <p class="page-subtitle">Очередь пуста.</p>
+                        {% endif %}
+                    </div>
+                </article>
+            </section>
+
+            <section class="admin-panel" data-tab-panel="history">
+                <article class="insight-card">
+                    <h3>История отправок email</h3>
+                    <form method="get" action="/admin/users" class="log-filter-form">
+                        <input type="hidden" name="tab" value="history">
+                        <label for="log-status">Фильтр по статусу:</label>
+                        <select id="log-status" name="log_status">
+                            <option value="all" {% if selected_log_status=="all" %}selected{% endif %}>Все</option>
+                            <option value="queued" {% if selected_log_status=="queued" %}selected{% endif %}>queued
+                            </option>
+                            <option value="sent" {% if selected_log_status=="sent" %}selected{% endif %}>sent</option>
+                            <option value="retry" {% if selected_log_status=="retry" %}selected{% endif %}>retry
+                            </option>
+                            <option value="failed" {% if selected_log_status=="failed" %}selected{% endif %}>failed
+                            </option>
+                            <option value="retry_manual" {% if selected_log_status=="retry_manual" %}selected{% endif
+                                %}>retry_manual</option>
+                        </select>
+                        <button class="action-btn ghost" type="submit">Применить</button>
+                    </form>
+                    <div class="admin-code-list">
+                        {% for log in email_logs %}
+                        <div class="admin-code-item">
+                            <span class="admin-code-value">{{ log.created_at }} | {{ log.recipient_email }} | {{
+                                log.export_format }} | {{ log.status }}</span>
+                            {% if log.status == "sent" %}
+                            <span class="status-badge active">успех</span>
+                            {% elif log.status in ["failed", "retry"] %}
+                            <span class="status-badge blocked">ошибка</span>
+                            {% elif log.status in ["queued", "retry_manual"] %}
+                            <span class="status-badge">в обработке</span>
+                            {% else %}
+                            <span class="status-badge">{{ log.status }}</span>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                        {% if not email_logs %}
+                        <p class="page-subtitle">Пока нет отправок.</p>
+                        {% endif %}
+                    </div>
+                </article>
+            </section>
+
+            <section class="admin-panel" data-tab-panel="audit">
+                <article class="insight-card">
+                    <h3>Аудит действий</h3>
+                    <div class="admin-code-list">
+                        {% for item in audit_logs %}
+                        <div class="admin-code-item">
+                            <span class="admin-code-value">{{ item.created_at }} | {{ item.action }} | {{
+                                item.entity_type }} {{ item.entity_id or "-" }}</span>
+                        </div>
+                        {% endfor %}
+                        {% if not audit_logs %}
+                        <p class="page-subtitle">Логи аудита пока пусты.</p>
+                        {% endif %}
+                    </div>
+                </article>
+            </section>
+        </section>
+    </main>
+    <script>
+        (function initThemeToggle() {
+            const root = document.documentElement;
+            const checkbox = document.getElementById("theme-toggle");
+            if (!checkbox) {
+                return;
+            }
+            const apply = (theme) => {
+                root.classList.toggle("theme-dark", theme === "dark");
+                checkbox.checked = theme === "dark";
+            };
+            const current = localStorage.getItem("theme") || "light";
+            apply(current);
+            checkbox.addEventListener("change", () => {
+                const next = root.classList.contains("theme-dark") ? "light" : "dark";
+                localStorage.setItem("theme", next);
+                apply(next);
+            });
+        })();
+
+        (function initAdminTabs() {
+            const tabs = Array.from(document.querySelectorAll(".admin-tab"));
+            const panels = Array.from(document.querySelectorAll(".admin-panel"));
+            if (!tabs.length || !panels.length) {
+                return;
+            }
+
+            function activate(tabName) {
+                tabs.forEach((tab) => {
+                    tab.classList.toggle("active", tab.dataset.tabTarget === tabName);
+                });
+                panels.forEach((panel) => {
+                    panel.classList.toggle("active", panel.dataset.tabPanel === tabName);
+                });
+            }
+
+            tabs.forEach((tab) => {
+                tab.addEventListener("click", () => activate(tab.dataset.tabTarget));
+            });
+            const queryTab = new URLSearchParams(window.location.search).get("tab");
+            const allowedTabs = new Set(["users", "schedules", "settings", "queue", "history", "audit"]);
+            activate(allowedTabs.has(queryTab || "") ? queryTab : "users");
+        })();
+    </script>
+    <script>
+        if ("serviceWorker" in navigator) {
+            window.addEventListener("load", () => {
+                navigator.serviceWorker.register("/static/service-worker.js?v=3").catch(() => { });
+            });
+        }
+    </script>
+</body>
+
+</html>

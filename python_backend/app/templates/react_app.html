@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+        try {
+            if (localStorage.getItem("theme") === "dark") {
+                document.documentElement.classList.add("theme-dark");
+            }
+        } catch (_) { }
+    </script>
+    <meta name="theme-color" content="#1f2f4f">
+    <link rel="manifest" href="{{ url_for('static', path='manifest.webmanifest') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='styles/style.css') }}">
+    {% for style_path in style_paths %}
+    <link rel="stylesheet" href="{{ url_for('static', path=style_path) }}">
+    {% endfor %}
+    <title>{{ title }}</title>
+</head>
+
+<body>
+    <div id="root"></div>
+    <script id="app-payload" type="application/json">{{ payload_json | safe }}</script>
+    <script type="module" src="{{ url_for('static', path='react/assets/main.js') }}?v=8"></script>
+</body>
+
+</html>

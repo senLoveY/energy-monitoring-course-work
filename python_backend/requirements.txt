@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+sqlalchemy
+psycopg2-binary
+jinja2
+openpyxl
+itsdangerous
+python-multipart
+fpdf2
+matplotlib
+pytest
+httpx

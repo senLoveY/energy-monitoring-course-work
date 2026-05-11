@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+        try {
+            if (localStorage.getItem("theme") === "dark") {
+                document.documentElement.classList.add("theme-dark");
+            }
+        } catch (_) { }
+    </script>
+    <meta name="theme-color" content="#1f2f4f">
+    <link rel="manifest" href="{{ url_for('static', path='manifest.webmanifest') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='styles/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='styles/activity.css') }}">
+    <title>Отчеты о статусах активности</title>
+</head>
+
+<body>
+    <header class="header">
+        <div class="header-row">
+            <div class="user-panel">
+                <span class="brand-mark">Energy Monitoring</span>
+                <p class="number">+375 (29) 824 11 67</p>
+            </div>
+            <div class="user-panel">
+                <span>{{ current_user.username }} ({{ current_user_role_label }})</span>
+                <label class="theme-switch" for="theme-toggle">
+                    <span>Темная тема</span>
+                    <input id="theme-toggle" type="checkbox" aria-label="Переключить тему">
+                    <span class="slider" aria-hidden="true"></span>
+                </label>
+                <a class="link-btn" href="/incidents">Инциденты</a>
+                {% if current_user.role == "admin" %}
+                <a class="link-btn" href="/admin/users">Админ-панель</a>
+                {% endif %}
+                <a class="link-btn" href="/logout">Выйти</a>
+            </div>
+        </div>
+    </header>
+    <main>
+        <section class="activity-reports">
+            <section class="page-head">
+                <div>
+                    <h1 class="page-title">Отчеты о статусах активности</h1>
+                    <p class="page-subtitle">Мониторинг энергопотребления по устройствам и времени (UTC{{
+                        "%+d"|format(timezone_offset_hours) }}).</p>
+                </div>
+                <span class="brand-mark">{{ report_date }}</span>
+            </section>
+            <section class="controls">
+                <div class="date-selector">
+                    <label for="report-date">Выберите дату:</label>
+                    <input type="date" id="report-date" value="{{ report_date }}" onchange="updateReportDate()">
+                </div>
+                <div class="date-selector">
+                    <label for="group-select">Группа устройств:</label>
+                    <select id="group-select" onchange="updateReportDate()">
+                        <option value="all" {% if selected_group=="all" %}selected{% endif %}>Все группы</option>
+                        {% for group in available_groups %}
+                        <option value="{{ group.id }}" {% if selected_group==group.id %}selected{% endif %}>{{
+                            group.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button class="refresh-btn" onclick="updateReportDate()">Обновить данные</button>
+                {% if not error_message %}
+                <button class="export-btn" type="button" onclick="openExportModal()">Экспорт отчета</button>
+                {% endif %}
+            </section>
+
+            <section class="insight-grid">
+                <article class="insight-card">
+                    <h3>Поток за последний час</h3>
+                    <p>Новых измерений: <strong>{{ insights.recent_samples }}</strong></p>
+                    <div class="insight-groups">
+                        {% for item in insights.group_stats %}
+                        <span class="insight-pill">{{ item.group_id }}: {{ item.samples }} (avg {{ item.avg_kwh }}
+                            kWh)</span>
+                        {% endfor %}
+                        {% if not insights.group_stats %}
+                        <span class="insight-pill">Нет свежих данных</span>
+                        {% endif %}
+                    </div>
+                </article>
+                <article class="insight-card">
+                    <h3>Аномалия к среднему</h3>
+                    <p>Текущая нагрузка: <strong id="anomaly-current-load">-</strong> kWh</p>
+                    <p>Средняя за час: <strong id="anomaly-hour-avg">-</strong> kWh</p>
+                    <p>Отклонение: <strong id="anomaly-delta">-</strong></p>
+                    <span id="anomaly-status" class="status-badge">норма</span>
+                </article>
+                <article class="insight-card">
+                    <h3>Live мониторинг (SSE)</h3>
+                    <p>Сервер: <strong id="live-server-time">-</strong></p>
+                    <p>Последняя точка: <strong id="live-last-seen">-</strong></p>
+                    <p>Сумма за 5 мин: <strong id="live-total-5m">0</strong> kWh</p>
+                    <p>Новых измерений за минуту: <strong id="live-samples-1m">0</strong></p>
+                    <span id="live-status" class="status-badge">подключение...</span>
+                </article>
+            </section>
+
+            {% if error_message %}
+            <section class="empty-state">
+                <h2>Нет данных за выбранную дату</h2>
+                <p>{{ error_message }}</p>
+                <p>Попробуйте выбрать другую дату или дождитесь новых показаний от симуляторов.</p>
+            </section>
+            {% else %}
+            <section class="summary-cards">
+                <div class="summary-card total">
+                    <h3>Общее потребление</h3>
+                    <div class="value">{{ total_consumption }} kWh</div>
+                    {% if trend >= 0 %}
+                    <div class="trend up">↑ {{ trend }}% с прошлого дня</div>
+                    {% else %}
+                    <div class="trend down">↓ {{ trend | abs }}% с прошлого дня</div>
+                    {% endif %}
+                </div>
+                <div class="summary-card peak">
+                    <h3>Пиковое потребление</h3>
+                    <div class="value">{{ peak_consumption.value }} kWh</div>
+                    <div class="time">в {{ peak_consumption.time }}</div>
+                </div>
+                <div class="summary-card low">
+                    <h3>Минимальное потребление</h3>
+                    <div class="value">{{ low_consumption.value }} kWh</div>
+                    <div class="time">в {{ low_consumption.time }}</div>
+                </div>
+            </section>
+
+            <section class="consumption-graph">
+                <h2>Визуализация потребления за {{ report_date }}</h2>
+                <div class="viz-toolbar">
+                    <label for="main-chart-type">Основной график:</label>
+                    <select id="main-chart-type">
+                        <option value="line" selected>Линейный</option>
+                        <option value="bar">Столбчатый</option>
+                        <option value="radar">Радар</option>
+                    </select>
+                </div>
+                <div class="viz-grid">
+                    <article class="viz-card">
+                        <h3>Потребление по времени (последний час)</h3>
+                        <div class="graph-container">
+                            <canvas id="consumptionChart"></canvas>
+                        </div>
+                    </article>
+                    <article class="viz-card">
+                        <h3>Структура по устройствам</h3>
+                        <div class="graph-container">
+                            <canvas id="shareChart"></canvas>
+                        </div>
+                    </article>
+                    <article class="viz-card">
+                        <h3>Топ устройств по сумме</h3>
+                        <div class="graph-container">
+                            <canvas id="topDevicesChart"></canvas>
+                        </div>
+                    </article>
+                    <article class="viz-card">
+                        <h3>Суммарная нагрузка (последний час)</h3>
+                        <div class="graph-container">
+                            <canvas id="loadProfileChart"></canvas>
+                        </div>
+                    </article>
+                </div>
+            </section>
+
+            <section class="detailed-report">
+                <h2>Детальный отчет по устройствам (последний час)</h2>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Время</th>
+                                {% for device in devices %}
+                                <th>{{ device.name }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for record in consumption_records_last_hour %}
+                            <tr>
+                                <td>{{ record.time }}</td>
+                                {% for consumption in record.consumptions %}
+                                <td>{{ consumption.value }} kWh</td>
+                                {% endfor %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            {% endif %}
+        </section>
+    </main>
+
+    <div id="export-modal" class="modal-overlay" onclick="closeExportModal(event)">
+        <div class="modal-card">
+            <h3>Экспорт отчета</h3>
+            <p>Выберите формат выгрузки отчета за текущую дату и группу.</p>
+            <label for="export-format">Формат файла:</label>
+            <select id="export-format">
+                <option value="pdf">PDF</option>
+                <option value="xlsx" selected>Excel (.xlsx)</option>
+            </select>
+            <label for="export-template">Шаблон отчета:</label>
+            <select id="export-template">
+                <option value="brief">Краткий (1 страница)</option>
+                <option value="detailed" selected>Детальный (графики + таблица)</option>
+            </select>
+            <label for="export-email">Email для отправки:</label>
+            <input id="export-email" type="email" placeholder="example@mail.com">
+            <p id="export-email-status" class="modal-status"></p>
+            <div class="modal-actions">
+                <button class="link-btn" type="button" onclick="closeExportModal()">Отмена</button>
+                <button class="export-btn" type="button" onclick="sendEmailReport()">Отправить на почту</button>
+                <button class="refresh-btn" type="button" onclick="startExport()">Скачать</button>
+            </div>
+        </div>
+    </div>
+
+    <script id="chart-labels-json" type="application/json">{{ chart_labels_json | safe }}</script>
+    <script id="chart-datasets-json" type="application/json">{{ chart_datasets_json | safe }}</script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        function updateReportDate() {
+            const selectedDate = document.getElementById("report-date").value;
+            const selectedGroup = document.getElementById("group-select").value;
+            const currentUrl = window.location.href.split("?")[0];
+            const params = new URLSearchParams();
+            params.set("date", selectedDate);
+            if (selectedGroup && selectedGroup !== "all") {
+                params.set("group", selectedGroup);
+            }
+            window.location.href = `${currentUrl}?${params.toString()}`;
+        }
+
+        function openExportModal() {
+            const modal = document.getElementById("export-modal");
+            if (modal) {
+                modal.classList.add("open");
+            }
+            const status = document.getElementById("export-email-status");
+            if (status) {
+                status.textContent = "";
+            }
+        }
+
+        function closeExportModal(evt = null) {
+            if (evt && evt.target && evt.target.id !== "export-modal") {
+                return;
+            }
+            const modal = document.getElementById("export-modal");
+            if (modal) {
+                modal.classList.remove("open");
+            }
+        }
+
+        function startExport() {
+            const selectedDate = document.getElementById("report-date").value;
+            const selectedGroup = document.getElementById("group-select").value;
+            const format = document.getElementById("export-format").value;
+            const template = document.getElementById("export-template").value;
+            const params = new URLSearchParams();
+            params.set("date", selectedDate);
+            params.set("format", format);
+            params.set("template", template);
+            if (selectedGroup && selectedGroup !== "all") {
+                params.set("group", selectedGroup);
+            }
+            closeExportModal();
+            window.location.href = `/activity/export?${params.toString()}`;
+        }
+
+        async function sendEmailReport() {
+            const status = document.getElementById("export-email-status");
+            const email = document.getElementById("export-email").value.trim();
+            const selectedDate = document.getElementById("report-date").value;
+            const selectedGroup = document.getElementById("group-select").value || "all";
+            const format = document.getElementById("export-format").value;
+            const template = document.getElementById("export-template").value;
+
+            if (!email) {
+                status.textContent = "Введите email для отправки";
+                status.classList.add("error");
+                return;
+            }
+
+            status.textContent = "Отправляем письмо...";
+            status.classList.remove("error");
+            try {
+                const response = await fetch("/activity/email-report", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        email: email,
+                        report_date: selectedDate,
+                        group: selectedGroup,
+                        export_format: format,
+                        template_mode: template,
+                    }),
+                });
+                const payload = await response.json();
+                if (!response.ok) {
+                    status.textContent = payload.error || "Ошибка отправки письма";
+                    status.classList.add("error");
+                    return;
+                }
+                status.textContent = "Письмо отправлено успешно";
+                status.classList.remove("error");
+            } catch (err) {
+                status.textContent = "Ошибка сети при отправке";
+                status.classList.add("error");
+            }
+        }
+
+        const labels = JSON.parse(document.getElementById("chart-labels-json")?.textContent || "[]");
+        const datasets = JSON.parse(document.getElementById("chart-datasets-json")?.textContent || "[]");
+        function getChartThemeColors() {
+            const isDarkTheme = document.documentElement.classList.contains("theme-dark");
+            return {
+                chartTextColor: isDarkTheme ? "#d1d5db" : "#4b5366",
+                chartTickColor: isDarkTheme ? "#c7d2fe" : "#56607a",
+                chartGridColorStrong: isDarkTheme ? "rgba(148,163,184,0.22)" : "rgba(40,60,90,0.12)",
+                chartGridColorSoft: isDarkTheme ? "rgba(148,163,184,0.16)" : "rgba(40,60,90,0.08)",
+            };
+        }
+        const palette = [
+            "#3d63dd", "#16a083", "#d35400", "#9b59b6", "#f39c12",
+            "#2f80ed", "#27ae60", "#e74c3c", "#5f6caf", "#00b894"
+        ];
+        const chartAnimationEnabled = false;
+
+        let mainChart = null;
+        let shareChart = null;
+        let topDevicesChart = null;
+        let loadProfileChart = null;
+
+        function getDeviceTotals() {
+            return datasets.map((dataset) => {
+                const total = (dataset.data || []).reduce((sum, point) => sum + Number(point || 0), 0);
+                return { label: dataset.label, total };
+            });
+        }
+
+        function parseLabelToMinutes(label) {
+            const match = String(label || "").match(/^(\d{1,2}):(\d{2})/);
+            if (!match) {
+                return null;
+            }
+            const hh = Number(match[1]);
+            const mm = Number(match[2]);
+            if (Number.isNaN(hh) || Number.isNaN(mm)) {
+                return null;
+            }
+            return hh * 60 + mm;
+        }
+
+        function buildRecentWindow(sourceLabels, sourceDatasets, hoursBack) {
+            const labelsInMinutes = sourceLabels.map(parseLabelToMinutes);
+            const validMinutes = labelsInMinutes.filter((minute) => minute !== null);
+
+            // Если формат времени не распознан, оставляем только хвост массива.
+            if (validMinutes.length === 0) {
+                const fallbackPoints = 12;
+                const startIdx = Math.max(0, sourceLabels.length - fallbackPoints);
+                return {
+                    labels: sourceLabels.slice(startIdx),
+                    datasets: sourceDatasets.map((dataset) => ({
+                        ...dataset,
+                        data: (dataset.data || []).slice(startIdx),
+                    })),
+                };
+            }
+
+            const maxMinute = Math.max(...validMinutes);
+            const minMinute = Math.max(0, maxMinute - hoursBack * 60);
+            let startIdx = labelsInMinutes.findIndex((minute) => minute !== null && minute >= minMinute);
+            if (startIdx === -1) {
+                startIdx = 0;
+            }
+
+            return {
+                labels: sourceLabels.slice(startIdx),
+                datasets: sourceDatasets.map((dataset) => ({
+                    ...dataset,
+                    data: (dataset.data || []).slice(startIdx),
+                })),
+            };
+        }
+
+        const recentWindow = buildRecentWindow(labels, datasets, 6);
+        const recentHourWindow = buildRecentWindow(labels, datasets, 1);
+
+        function updateAnomalyCard() {
+            const currentEl = document.getElementById("anomaly-current-load");
+            const avgEl = document.getElementById("anomaly-hour-avg");
+            const deltaEl = document.getElementById("anomaly-delta");
+            const statusEl = document.getElementById("anomaly-status");
+            if (!currentEl || !avgEl || !deltaEl || !statusEl) {
+                return;
+            }
+
+            const totalsBySlot = recentHourWindow.labels.map((_, idx) =>
+                recentHourWindow.datasets.reduce((sum, dataset) => sum + Number((dataset.data || [])[idx] || 0), 0)
+            );
+            if (!totalsBySlot.length) {
+                currentEl.textContent = "-";
+                avgEl.textContent = "-";
+                deltaEl.textContent = "-";
+                statusEl.textContent = "норма";
+                statusEl.classList.remove("anomaly-warn", "anomaly-peak");
+                statusEl.classList.add("anomaly-normal");
+                return;
+            }
+
+            const current = Number(totalsBySlot[totalsBySlot.length - 1] || 0);
+            const avg = totalsBySlot.reduce((acc, value) => acc + value, 0) / totalsBySlot.length;
+            const deltaPercent = avg > 0 ? ((current - avg) / avg) * 100 : (current > 0 ? 100 : 0);
+
+            let statusLabel = "норма";
+            let statusClass = "anomaly-normal";
+            if (deltaPercent > 35) {
+                statusLabel = "пик";
+                statusClass = "anomaly-peak";
+            } else if (deltaPercent > 15) {
+                statusLabel = "выше нормы";
+                statusClass = "anomaly-warn";
+            }
+
+            currentEl.textContent = current.toFixed(3);
+            avgEl.textContent = avg.toFixed(3);
+            deltaEl.textContent = `${deltaPercent >= 0 ? "+" : ""}${deltaPercent.toFixed(1)}%`;
+            statusEl.textContent = statusLabel;
+            statusEl.classList.remove("anomaly-normal", "anomaly-warn", "anomaly-peak");
+            statusEl.classList.add(statusClass);
+        }
+
+        function buildMainDatasets(mainType, sourceDatasets) {
+            function withAlpha(color, alpha) {
+                const raw = String(color || "").trim();
+                if (!raw) {
+                    return `rgba(61, 99, 221, ${alpha})`;
+                }
+                if (raw.startsWith("#")) {
+                    if (raw.length === 7) {
+                        const r = parseInt(raw.slice(1, 3), 16);
+                        const g = parseInt(raw.slice(3, 5), 16);
+                        const b = parseInt(raw.slice(5, 7), 16);
+                        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+                    }
+                    if (raw.length === 4) {
+                        const r = parseInt(raw[1] + raw[1], 16);
+                        const g = parseInt(raw[2] + raw[2], 16);
+                        const b = parseInt(raw[3] + raw[3], 16);
+                        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+                    }
+                }
+                if (raw.startsWith("rgb(")) {
+                    const nums = raw.replace("rgb(", "").replace(")", "").split(",").map((x) => Number(x.trim()));
+                    if (nums.length >= 3) {
+                        return `rgba(${nums[0]}, ${nums[1]}, ${nums[2]}, ${alpha})`;
+                    }
+                }
+                if (raw.startsWith("rgba(")) {
+                    return raw.replace(/rgba\(([^)]+),\s*[\d.]+\)/, `rgba($1, ${alpha})`);
+                }
+                return raw;
+            }
+
+            return sourceDatasets.map((dataset, index) => ({
+                ...dataset,
+                fill: mainType === "line",
+                borderWidth: 2,
+                tension: mainType === "line" ? 0.28 : 0,
+                pointRadius: mainType === "line" ? 0 : 2,
+                pointHoverRadius: mainType === "line" ? 3 : 4,
+                backgroundColor:
+                    mainType === "line"
+                        ? withAlpha(dataset.borderColor || palette[index % palette.length], 0.22)
+                        : (dataset.backgroundColor || palette[index % palette.length]),
+            }));
+        }
+
+        function renderMainChart() {
+            const chartTypeEl = document.getElementById("main-chart-type");
+            const chartCanvas = document.getElementById("consumptionChart");
+            if (!chartTypeEl || !chartCanvas) {
+                return;
+            }
+            const { chartTextColor, chartTickColor, chartGridColorStrong, chartGridColorSoft } = getChartThemeColors();
+            const chartType = chartTypeEl.value;
+            const ctx = chartCanvas.getContext("2d");
+            if (mainChart) {
+                mainChart.destroy();
+            }
+
+            mainChart = new Chart(ctx, {
+                type: chartType,
+                data: {
+                    labels: recentHourWindow.labels,
+                    datasets: buildMainDatasets(chartType, recentHourWindow.datasets),
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: chartAnimationEnabled,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: chartTextColor
+                            }
+                        }
+                    },
+                    scales: chartType === "radar" ? {} : {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { color: chartTickColor },
+                            grid: { color: chartGridColorStrong }
+                        },
+                        x: {
+                            ticks: { color: chartTickColor, maxRotation: 0, autoSkip: true },
+                            grid: { color: chartGridColorSoft }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderShareChart() {
+            const totals = getDeviceTotals();
+            const ctx = document.getElementById("shareChart").getContext("2d");
+            if (shareChart) {
+                shareChart.destroy();
+            }
+            const { chartTextColor } = getChartThemeColors();
+
+            shareChart = new Chart(ctx, {
+                type: "doughnut",
+                data: {
+                    labels: totals.map((item) => item.label),
+                    datasets: [{
+                        data: totals.map((item) => Number(item.total.toFixed(3))),
+                        backgroundColor: totals.map((_, index) => palette[index % palette.length]),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: chartAnimationEnabled,
+                    plugins: {
+                        legend: {
+                            position: "bottom",
+                            labels: { color: chartTextColor, boxWidth: 14 }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderTopDevicesChart() {
+            const top = getDeviceTotals()
+                .sort((a, b) => b.total - a.total)
+                .slice(0, 8);
+            const ctx = document.getElementById("topDevicesChart").getContext("2d");
+            if (topDevicesChart) {
+                topDevicesChart.destroy();
+            }
+            const { chartTextColor, chartTickColor, chartGridColorStrong } = getChartThemeColors();
+
+            topDevicesChart = new Chart(ctx, {
+                type: "bar",
+                data: {
+                    labels: top.map((item) => item.label),
+                    datasets: [{
+                        label: "kWh за день",
+                        data: top.map((item) => Number(item.total.toFixed(3))),
+                        backgroundColor: top.map((_, index) => palette[index % palette.length]),
+                    }]
+                },
+                options: {
+                    indexAxis: "y",
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: chartAnimationEnabled,
+                    plugins: {
+                        legend: { labels: { color: chartTextColor } }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: chartTickColor },
+                            grid: { color: chartGridColorStrong }
+                        },
+                        y: {
+                            ticks: { color: chartTickColor },
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderLoadProfileChart() {
+            const totalsBySlot = recentHourWindow.labels.map((_, idx) =>
+                recentHourWindow.datasets.reduce((sum, dataset) => sum + Number((dataset.data || [])[idx] || 0), 0)
+            );
+            const ctx = document.getElementById("loadProfileChart").getContext("2d");
+            if (loadProfileChart) {
+                loadProfileChart.destroy();
+            }
+            const { chartTextColor, chartTickColor, chartGridColorStrong, chartGridColorSoft } = getChartThemeColors();
+
+            loadProfileChart = new Chart(ctx, {
+                type: "bar",
+                data: {
+                    labels: recentHourWindow.labels,
+                    datasets: [{
+                        label: "Суммарно kWh",
+                        data: totalsBySlot.map((v) => Number(v.toFixed(3))),
+                        backgroundColor: "rgba(61, 99, 221, 0.45)",
+                        borderColor: "#3d63dd",
+                        borderWidth: 1.2,
+                        borderRadius: 6,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: chartAnimationEnabled,
+                    plugins: {
+                        legend: {
+                            labels: { color: chartTextColor }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: chartTickColor, maxRotation: 0, autoSkip: true },
+                            grid: { color: chartGridColorSoft }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            ticks: { color: chartTickColor },
+                            grid: { color: chartGridColorStrong }
+                        }
+                    }
+                }
+            });
+        }
+
+        const mainChartTypeEl = document.getElementById("main-chart-type");
+        updateAnomalyCard();
+        if (mainChartTypeEl) {
+            renderMainChart();
+            renderShareChart();
+            renderTopDevicesChart();
+            renderLoadProfileChart();
+            mainChartTypeEl.addEventListener("change", renderMainChart);
+        }
+    </script>
+    <script>
+        (function initThemeToggle() {
+            const root = document.documentElement;
+            const checkbox = document.getElementById("theme-toggle");
+            if (!checkbox) {
+                return;
+            }
+            const apply = (theme) => {
+                root.classList.toggle("theme-dark", theme === "dark");
+                checkbox.checked = theme === "dark";
+            };
+            const current = localStorage.getItem("theme") || "light";
+            apply(current);
+            checkbox.addEventListener("change", () => {
+                const next = root.classList.contains("theme-dark") ? "light" : "dark";
+                localStorage.setItem("theme", next);
+                apply(next);
+                if (typeof renderMainChart === "function") {
+                    renderMainChart();
+                    renderShareChart();
+                    renderTopDevicesChart();
+                    renderLoadProfileChart();
+                }
+            });
+        })();
+
+        (function initLiveUpdates() {
+            const statusEl = document.getElementById("live-status");
+            const serverTimeEl = document.getElementById("live-server-time");
+            const lastSeenEl = document.getElementById("live-last-seen");
+            const totalEl = document.getElementById("live-total-5m");
+            const samplesEl = document.getElementById("live-samples-1m");
+            if (!statusEl || !window.EventSource) {
+                return;
+            }
+            const selectedGroup = document.getElementById("group-select")?.value || "all";
+            const stream = new EventSource(`/activity/stream?group=${encodeURIComponent(selectedGroup)}`);
+            stream.addEventListener("open", () => {
+                statusEl.textContent = "online";
+                statusEl.classList.add("active");
+            });
+            stream.addEventListener("error", () => {
+                statusEl.textContent = "переподключение...";
+                statusEl.classList.remove("active");
+            });
+            stream.addEventListener("stats", (event) => {
+                try {
+                    const payload = JSON.parse(event.data || "{}");
+                    serverTimeEl.textContent = payload.server_time || "-";
+                    lastSeenEl.textContent = payload.last_seen || "-";
+                    totalEl.textContent = String(payload.total_last_5m ?? 0);
+                    samplesEl.textContent = String(payload.active_samples_1m ?? 0);
+                } catch (_) { }
+            });
+        })();
+
+        if ("serviceWorker" in navigator) {
+            window.addEventListener("load", () => {
+                navigator.serviceWorker.register("/static/service-worker.js?v=3").catch(() => { });
+            });
+        }
+    </script>
+</body>
+
+</html>

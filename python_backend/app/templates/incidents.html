@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+        try {
+            if (localStorage.getItem("theme") === "dark") {
+                document.documentElement.classList.add("theme-dark");
+            }
+        } catch (_) {}
+    </script>
+    <meta name="theme-color" content="#1f2f4f">
+    <link rel="manifest" href="{{ url_for('static', path='manifest.webmanifest') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='styles/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='styles/activity.css') }}">
+    <title>Журнал инцидентов</title>
+</head>
+<body>
+<header class="header">
+    <div class="header-row">
+        <div class="user-panel">
+            <span class="brand-mark">Energy Monitoring</span>
+            <p class="number">+375 (29) 824 11 67</p>
+        </div>
+        <div class="user-panel">
+            <span>{{ current_user.username }} ({{ current_user_role_label }})</span>
+            <label class="theme-switch" for="theme-toggle">
+                <span>Темная тема</span>
+                <input id="theme-toggle" type="checkbox" aria-label="Переключить тему">
+                <span class="slider" aria-hidden="true"></span>
+            </label>
+            <a class="link-btn" href="/activity">Активность</a>
+            {% if current_user.role == "admin" %}
+            <a class="link-btn" href="/admin/users">Админ-панель</a>
+            {% endif %}
+            <a class="link-btn" href="/logout">Выйти</a>
+        </div>
+    </div>
+</header>
+
+<main>
+    <section class="activity-reports">
+        <section class="page-head">
+            <div>
+                <h1 class="page-title">Журнал инцидентов</h1>
+                <p class="page-subtitle">Ручные отметки событий и причин пиков нагрузки (UTC{{ "%+d"|format(timezone_offset_hours) }}).</p>
+            </div>
+            <span class="brand-mark">{{ report_date }}</span>
+        </section>
+
+        <section class="controls">
+            <div class="date-selector">
+                <label for="report-date">Выберите дату:</label>
+                <input type="date" id="report-date" value="{{ report_date }}" onchange="updateIncidentsPage()">
+            </div>
+            <div class="date-selector">
+                <label for="group-select">Группа устройств:</label>
+                <select id="group-select" onchange="updateIncidentsPage()">
+                    <option value="all" {% if selected_group == "all" %}selected{% endif %}>Все группы</option>
+                    {% for group in available_groups %}
+                    <option value="{{ group.id }}" {% if selected_group == group.id %}selected{% endif %}>{{ group.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button class="refresh-btn" onclick="updateIncidentsPage()">Обновить данные</button>
+        </section>
+
+        {% if incident_message %}
+        <p class="generated-code">{{ incident_message }}</p>
+        {% endif %}
+
+        {% if can_manage_incidents %}
+        <section class="detailed-report">
+            <h2>Добавить инцидент</h2>
+            <form class="schedule-form" method="post" action="/incidents">
+                <input type="hidden" name="date" value="{{ report_date }}">
+                <input type="hidden" name="group" value="{{ selected_group }}">
+                <label for="incident-occurred-at">Время инцидента</label>
+                <input id="incident-occurred-at" name="occurred_at" type="datetime-local">
+                <label for="incident-type">Тип</label>
+                <select id="incident-type" name="incident_type">
+                    {% for item in incident_types %}
+                    <option value="{{ item }}">{{ incident_type_labels.get(item, item) }}</option>
+                    {% endfor %}
+                </select>
+                <label for="incident-severity">Критичность</label>
+                <select id="incident-severity" name="severity">
+                    {% for item in incident_severities %}
+                    <option value="{{ item }}" {% if item == "medium" %}selected{% endif %}>
+                        {{ incident_severity_labels.get(item, item) }}
+                    </option>
+                    {% endfor %}
+                </select>
+                <label for="incident-title">Заголовок</label>
+                <input id="incident-title" name="title" type="text" required placeholder="Например: Пуск линии №2">
+                <label for="incident-description">Комментарий</label>
+                <input id="incident-description" name="description" type="text" placeholder="Краткое описание">
+                <button class="refresh-btn" type="submit">Добавить инцидент</button>
+            </form>
+        </section>
+        {% endif %}
+
+        <section class="detailed-report">
+            <h2>События за день</h2>
+            <div class="table-container">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Время</th>
+                        <th>Тип</th>
+                        <th>Критичность</th>
+                        <th>Группа</th>
+                        <th>Заголовок</th>
+                        <th>Комментарий</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for incident in incidents %}
+                    <tr>
+                        <td>{{ incident.occurred_at.strftime("%Y-%m-%d %H:%M") }}</td>
+                        <td>{{ incident_type_labels.get(incident.incident_type, incident.incident_type) }}</td>
+                        <td>{{ incident_severity_labels.get(incident.severity, incident.severity) }}</td>
+                        <td>{{ incident.group_id }}</td>
+                        <td>{{ incident.title }}</td>
+                        <td>{{ incident.description or "-" }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% if not incidents %}
+                    <tr>
+                        <td colspan="6">Нет записей об инцидентах за выбранный день</td>
+                    </tr>
+                    {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </section>
+</main>
+
+<script>
+    (function initThemeToggle() {
+        const root = document.documentElement;
+        const checkbox = document.getElementById("theme-toggle");
+        if (!checkbox) {
+            return;
+        }
+        const apply = (theme) => {
+            root.classList.toggle("theme-dark", theme === "dark");
+            checkbox.checked = theme === "dark";
+        };
+        const current = localStorage.getItem("theme") || "light";
+        apply(current);
+        checkbox.addEventListener("change", () => {
+            const next = root.classList.contains("theme-dark") ? "light" : "dark";
+            localStorage.setItem("theme", next);
+            apply(next);
+        });
+    })();
+
+    function updateIncidentsPage() {
+        const selectedDate = document.getElementById("report-date").value;
+        const selectedGroup = document.getElementById("group-select").value;
+        const params = new URLSearchParams();
+        params.set("date", selectedDate);
+        if (selectedGroup && selectedGroup !== "all") {
+            params.set("group", selectedGroup);
+        }
+        window.location.href = `/incidents?${params.toString()}`;
+    }
+
+    if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+            navigator.serviceWorker.register("/static/service-worker.js?v=3").catch(() => {});
+        });
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+        try {
+            if (localStorage.getItem("theme") === "dark") {
+                document.documentElement.classList.add("theme-dark");
+            }
+        } catch (_) { }
+    </script>
+    <meta name="theme-color" content="#1f2f4f">
+    <link rel="manifest" href="{{ url_for('static', path='manifest.webmanifest') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='styles/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='styles/auth.css') }}">
+    <title>Регистрация</title>
+</head>
+
+<body>
+    <main class="auth-main">
+        <section class="auth-layout">
+            <aside class="auth-aside">
+                <span class="auth-badge">Access Provisioning</span>
+                <h2 class="auth-title">Создай аккаунт и подключись к системе</h2>
+                <p class="auth-subtitle">Для роли Администратор требуется специальный код, остальные роли доступны при
+                    регистрации.</p>
+                <ul class="auth-list">
+                    <li>Защищенная аутентификация</li>
+                    <li>Роли и разделение доступа</li>
+                    <li>Быстрый переход в аналитическую панель</li>
+                </ul>
+            </aside>
+            <section class="auth-card">
+                <h1>Регистрация</h1>
+                <p class="auth-note">Заполните форму и начните работу.</p>
+                {% if error %}
+                <p class="error">{{ error }}</p>
+                {% endif %}
+                <form method="post" action="/register" class="auth-form">
+                    <label>
+                        Username
+                        <input name="username" type="text" placeholder="например, pavel" required>
+                    </label>
+                    <label>
+                        Пароль (минимум 6 символов)
+                        <input name="password" type="password" required minlength="6">
+                    </label>
+                    <label>
+                        Роль
+                        <select name="role">
+                            <option value="observer">Наблюдатель</option>
+                            <option value="operator">Оператор</option>
+                            <option value="engineer">Инженер</option>
+                            <option value="admin">Администратор</option>
+                        </select>
+                    </label>
+                    <label>
+                        Код администратора (для Администратора)
+                        <input name="admin_code" type="text" placeholder="Введите код при необходимости">
+                    </label>
+                    <button type="submit">Создать аккаунт</button>
+                </form>
+                <p class="auth-switch">Уже есть аккаунт? <a href="/login">Войти</a></p>
+            </section>
+        </section>
+    </main>
+    <script>
+        if ("serviceWorker" in navigator) {
+            window.addEventListener("load", () => {
+                navigator.serviceWorker.register("/static/service-worker.js?v=3").catch(() => { });
+            });
+        }
+    </script>
+</body>
+
+</html>

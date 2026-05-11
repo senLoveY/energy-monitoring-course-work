@@ -1,0 +1,16 @@
+{
+  "name": "Energy Monitoring",
+  "short_name": "Energy",
+  "start_url": "/activity",
+  "display": "standalone",
+  "background_color": "#f3f6fd",
+  "theme_color": "#1f2f4f",
+  "icons": [
+    {
+      "src": "/static/pwa/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

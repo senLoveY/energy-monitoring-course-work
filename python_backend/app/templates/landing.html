@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+        try {
+            if (localStorage.getItem("theme") === "dark") {
+                document.documentElement.classList.add("theme-dark");
+            }
+        } catch (_) {}
+    </script>
+    <meta name="theme-color" content="#1f2f4f">
+    <link rel="manifest" href="{{ url_for('static', path='manifest.webmanifest') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='styles/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='styles/landing.css') }}">
+    <title>Energy Monitoring</title>
+</head>
+<body>
+<header class="header">
+    <div class="header-row">
+        <div class="user-panel">
+            <span class="brand-mark">Energy Monitoring</span>
+            <p class="number">Промышленный мониторинг энергопотребления</p>
+        </div>
+        <div class="user-panel">
+            <label class="theme-switch" for="theme-toggle">
+                <span>Темная тема</span>
+                <input id="theme-toggle" type="checkbox" aria-label="Переключить тему">
+                <span class="slider" aria-hidden="true"></span>
+            </label>
+            {% if current_user %}
+            <a class="link-btn" href="/activity">Открыть панель</a>
+            {% endif %}
+            <a class="link-btn" href="/login">Войти</a>
+        </div>
+    </div>
+</header>
+
+<main>
+    <section class="landing-wrap">
+        <article class="hero-card">
+            <span class="hero-badge">Energy Monitoring Platform</span>
+            <h1>Контроль энергопотребления в реальном времени</h1>
+            <p>
+                Система показывает живые показатели по устройствам и группам, формирует отчеты, ведет журнал инцидентов
+                и помогает быстро находить причины пиковых нагрузок.
+            </p>
+            <div class="hero-actions">
+                <a class="hero-btn primary" href="/login">Перейти ко входу</a>
+                {% if current_user %}
+                <a class="hero-btn secondary" href="/activity">Открыть рабочую панель</a>
+                {% endif %}
+            </div>
+        </article>
+
+        <section class="feature-grid">
+            <article class="feature-card">
+                <h3>Realtime дашборд</h3>
+                <p>Поток данных обновляется без перезагрузки страницы через SSE и показывает состояние сети в реальном времени.</p>
+            </article>
+            <article class="feature-card">
+                <h3>Гибкие отчеты</h3>
+                <p>Аналитика по дате и группам, экспорт в PDF/XLSX и рассылка отчетов по расписанию для разных ролей.</p>
+            </article>
+            <article class="feature-card">
+                <h3>Журнал инцидентов</h3>
+                <p>Ручная фиксация пусков, ремонтов и аварий помогает объяснять всплески и связывать события с графиками.</p>
+            </article>
+            <article class="feature-card">
+                <h3>RBAC доступ</h3>
+                <p>Роли наблюдателя, оператора, инженера и администратора с разграничением действий в интерфейсе.</p>
+            </article>
+            <article class="feature-card">
+                <h3>PWA и мобильность</h3>
+                <p>Интерфейс адаптирован под мобильные устройства, поддерживает установку как приложение и офлайн-кэш статики.</p>
+            </article>
+            <article class="feature-card">
+                <h3>Единая админ-панель</h3>
+                <p>Управление пользователями, ролями, очередью отправки, аудитом действий и системными настройками времени.</p>
+            </article>
+        </section>
+    </section>
+</main>
+
+<script>
+    (function initThemeToggle() {
+        const root = document.documentElement;
+        const checkbox = document.getElementById("theme-toggle");
+        if (!checkbox) {
+            return;
+        }
+        const apply = (theme) => {
+            root.classList.toggle("theme-dark", theme === "dark");
+            checkbox.checked = theme === "dark";
+        };
+        const current = localStorage.getItem("theme") || "light";
+        apply(current);
+        checkbox.addEventListener("change", () => {
+            const next = root.classList.contains("theme-dark") ? "light" : "dark";
+            localStorage.setItem("theme", next);
+            apply(next);
+        });
+    })();
+
+    if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+            navigator.serviceWorker.register("/static/service-worker.js?v=3").catch(() => {});
+        });
+    }
+</script>
+</body>
+</html>

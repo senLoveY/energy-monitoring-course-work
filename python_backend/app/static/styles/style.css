@@ -1,0 +1,341 @@
+:root {
+    --bg: #f3f0e8;
+    --bg-soft: #e7e2d3;
+    --ink: #1e2430;
+    --ink-soft: #5d6574;
+    --card: #fffdf8;
+    --line: #d8d1bf;
+    --primary: #2d6bff;
+    --primary-strong: #1f4ec6;
+    --accent: #ff6b35;
+    --success: #0a9a6f;
+    --danger: #c83256;
+    --warning: #d88917;
+    --btn-light-bg: #ffffff;
+    --btn-light-ink: #1e2430;
+    --btn-light-border: #d8d1bf;
+    --radius: 16px;
+}
+
+:root.theme-dark {
+    --bg: #0b1220;
+    --bg-soft: #131d33;
+    --ink: #eef2ff;
+    --ink-soft: #b7c0d4;
+    --card: #111b30;
+    --line: #2d3b58;
+    --primary: #60a5fa;
+    --primary-strong: #3b82f6;
+    --accent: #fb923c;
+    --success: #34d399;
+    --danger: #fb7185;
+    --warning: #f59e0b;
+    --btn-light-bg: #e5e7eb;
+    --btn-light-ink: #0b1220;
+    --btn-light-border: #94a3b8;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: "Inter", "Segoe UI", Roboto, sans-serif;
+    background:
+        linear-gradient(to right, rgba(45, 107, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(45, 107, 255, 0.03) 1px, transparent 1px),
+        var(--bg);
+    background-size: 28px 28px, 28px 28px, auto;
+    color: var(--ink);
+}
+
+:root.theme-dark body {
+    background:
+        linear-gradient(to right, rgba(148, 163, 184, 0.06) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(148, 163, 184, 0.06) 1px, transparent 1px),
+        var(--bg);
+    background-size: 28px 28px, 28px 28px, auto;
+}
+
+a {
+    color: var(--primary);
+}
+
+.header {
+    padding: 16px 24px;
+    background: var(--card);
+    border-bottom: 1px solid var(--line);
+}
+
+.header-row {
+    max-width: 1280px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.number {
+    margin: 0;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    color: var(--ink-soft);
+}
+
+.user-panel {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    color: var(--ink-soft);
+}
+
+.brand-mark {
+    font-weight: 800;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    font-size: 13px;
+    color: var(--ink);
+    padding: 5px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--bg-soft);
+}
+
+.link-btn {
+    text-decoration: none;
+    color: var(--btn-light-ink);
+    border: 1px solid var(--btn-light-border);
+    border-radius: 11px;
+    padding: 7px 11px;
+    background: var(--btn-light-bg);
+    transition: all 0.2s ease;
+}
+
+.link-btn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.user-dropdown {
+    position: relative;
+}
+
+.user-dropdown-trigger {
+    border: 1px solid var(--btn-light-border);
+    background: var(--btn-light-bg);
+    color: var(--btn-light-ink);
+    border-radius: 11px;
+    padding: 7px 11px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.user-dropdown-arrow {
+    font-size: 10px;
+    transition: transform 0.2s ease;
+}
+
+.user-dropdown-arrow.open {
+    transform: rotate(180deg);
+}
+
+.user-dropdown-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 8px);
+    width: 220px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--card);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
+    padding: 10px;
+    z-index: 1000;
+    display: grid;
+    gap: 8px;
+}
+
+.user-dropdown-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(9, 16, 29, 0.34);
+    backdrop-filter: blur(3px);
+    z-index: 1990;
+    animation: dropdown-backdrop-in 0.18s ease;
+}
+
+.user-dropdown-modal {
+    position: fixed;
+    top: 74px;
+    right: 24px;
+    width: min(320px, calc(100vw - 32px));
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--card);
+    box-shadow:
+        0 18px 44px rgba(9, 16, 29, 0.22),
+        8px 8px 0 color-mix(in srgb, var(--bg-soft) 86%, transparent);
+    padding: 14px;
+    z-index: 2000;
+    display: grid;
+    gap: 10px;
+    animation: dropdown-modal-in 0.2s ease;
+}
+
+.user-dropdown-modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    color: var(--ink);
+}
+
+.user-dropdown-close {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--bg-soft);
+    color: var(--ink-soft);
+    width: 30px;
+    height: 30px;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.user-dropdown-close:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.user-dropdown-label {
+    font-size: 12px;
+    color: var(--ink-soft);
+}
+
+.user-dropdown-select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--ink);
+}
+
+.user-dropdown-theme {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--ink-soft);
+    padding: 4px 0;
+}
+
+.user-dropdown-theme-btn {
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--bg-soft);
+    color: var(--ink);
+    padding: 4px 10px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.user-dropdown-theme-btn.active {
+    border-color: var(--primary);
+    background: var(--primary);
+    color: #fff;
+}
+
+.user-dropdown-logout {
+    text-decoration: none;
+    color: var(--danger);
+    border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+    border-radius: 8px;
+    padding: 8px 10px;
+    text-align: center;
+    font-weight: 700;
+}
+
+.user-dropdown-logout:hover {
+    background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+
+@keyframes dropdown-modal-in {
+    from {
+        opacity: 0;
+        transform: translateY(-8px) scale(0.98);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes dropdown-backdrop-in {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+main {
+    padding: 28px 24px 36px;
+}
+
+.theme-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--ink-soft);
+    font-size: 13px;
+}
+
+.theme-switch input {
+    display: none;
+}
+
+.theme-switch .slider {
+    width: 44px;
+    height: 24px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--bg-soft);
+    position: relative;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.theme-switch .slider::after {
+    content: "";
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #ffffff;
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    transition: transform 0.2s ease;
+}
+
+.theme-switch input:checked+.slider {
+    background: var(--primary);
+    border-color: var(--primary);
+}
+
+.theme-switch input:checked+.slider::after {
+    transform: translateX(20px);
+}
+
+:root.theme-dark .theme-switch .slider::after {
+    background: #e5e7eb;
+}
